@@ -101,10 +101,31 @@ export interface ChatAnalysisResponse extends AnalysisResponse {
   messages: string[]
 }
 
+export interface AudioAnalysisResponse extends AnalysisResponse {
+  audio_file: string
+  deepfake_score: number
+  is_deepfake: boolean
+  audio_metadata: {
+    sample_rate?: number
+    duration?: number
+    channels?: number
+    segments_analyzed?: number
+    file_size?: number
+    file_type?: string
+    analysis_method?: string
+  }
+}
+
 export interface AnalysisRequest {
   content: string
   channel: 'sms' | 'email' | 'chat'
   sender_info?: string
+}
+
+export interface AudioAnalysisRequest {
+  audio_file: File
+  caller_id?: string
+  call_duration?: number
 }
 
 export interface EmailAnalysisRequest {

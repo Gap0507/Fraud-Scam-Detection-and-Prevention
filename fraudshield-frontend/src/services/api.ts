@@ -7,6 +7,7 @@ import {
   EmailAnalysisResponse, 
   ChatAnalysisRequest, 
   ChatAnalysisResponse,
+  AudioAnalysisResponse,
   ApiError 
 } from '@/types/analysis'
 
@@ -77,12 +78,43 @@ export const apiService = {
     return handleResponse(response)
   },
 
+  // Old audio analyzer removed - using only Gemini now
+
+  // Analyze audio with Gemini
+  async analyzeAudioGemini(audioFile: File): Promise<AudioAnalysisResponse> {
+    const formData = new FormData()
+    formData.append('audio_file', audioFile)
+
+    const response = await fetch(`${API_BASE_URL}/analyze/audio/gemini`, {
+      method: 'POST',
+      body: formData,
+    })
+    return handleResponse(response)
+  },
+
+  // Analyze video with Gemini
+  async analyzeVideoGemini(videoFile: File): Promise<any> {
+    const formData = new FormData()
+    formData.append('video_file', videoFile)
+
+    const response = await fetch(`${API_BASE_URL}/analyze/video/gemini`, {
+      method: 'POST',
+      body: formData,
+    })
+    return handleResponse(response)
+  },
+
+  // Comparison removed - using only Gemini now
+
+  // Transcription removed - using only Gemini now
+
   // Get model status
   async getModelStatus(): Promise<{
     text_analyzer: { ready: boolean; model_name: string }
     sms_analyzer: { ready: boolean; model_name: string }
     email_analyzer: { ready: boolean; model_name: string }
     chat_analyzer: { ready: boolean; model_name: string }
+    audio_analyzer: { ready: boolean; model_name: string }
     voice_analyzer: { ready: boolean; model_name: string }
     video_analyzer: { ready: boolean; model_name: string }
   }> {
@@ -151,4 +183,17 @@ export function getConfidenceColor(confidence: number): string {
   if (confidence >= 0.6) return 'text-yellow-400'
   return 'text-red-400'
 }
+
+// Export individual functions for easier imports
+export const { 
+  healthCheck, 
+  analyzeText, 
+  analyzeEmail, 
+  analyzeChat, 
+  analyzeAudioGemini,
+  analyzeVideoGemini,
+  getModelStatus, 
+  generateSimulatedData, 
+  analyzeUnified 
+} = apiService
 

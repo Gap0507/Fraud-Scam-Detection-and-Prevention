@@ -68,6 +68,12 @@ class EmailAnalysisResponse(AnalysisResult):
     suspicious_links: List[Dict[str, Any]] = Field(default=[], description="Suspicious links found")
     detailed_analysis: Optional[Dict[str, Any]] = Field(None, description="Detailed analysis breakdown")
 
+class AudioAnalysisRequest(BaseModel):
+    """Audio analysis request"""
+    audio_file: str = Field(..., description="Audio file path or base64 encoded audio")
+    caller_id: Optional[str] = Field(None, description="Caller ID or phone number")
+    call_duration: Optional[float] = Field(None, description="Call duration in seconds")
+
 class VoiceAnalysisRequest(BaseModel):
     """Voice analysis request"""
     audio_file: str = Field(..., description="Audio file path or content")
@@ -82,6 +88,14 @@ class VideoAnalysisRequest(BaseModel):
 class TextAnalysisResponse(AnalysisResult):
     """Text analysis response"""
     highlighted_tokens: List[HighlightedToken] = Field(..., description="Tokens to highlight in UI")
+    detailed_analysis: Optional[Dict[str, Any]] = Field(None, description="Detailed analysis breakdown")
+
+class AudioAnalysisResponse(AnalysisResult):
+    """Audio analysis response"""
+    audio_file: str = Field(..., description="Audio file path")
+    deepfake_score: float = Field(..., description="Deepfake detection score (0.0 to 1.0)", ge=0.0, le=1.0)
+    is_deepfake: bool = Field(..., description="Whether audio is detected as deepfake")
+    audio_metadata: Dict[str, Any] = Field(..., description="Audio file metadata")
     detailed_analysis: Optional[Dict[str, Any]] = Field(None, description="Detailed analysis breakdown")
 
 class VoiceAnalysisResponse(AnalysisResult):

@@ -3,7 +3,7 @@ FraudShield AI Service - Multi-Channel Digital Fraud Detection
 Main FastAPI application with AI endpoints for text, voice, and video analysis
 """
 
-from fastapi import FastAPI, HTTPException, Form
+from fastapi import FastAPI, HTTPException, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -17,11 +17,13 @@ from services.text_analyzer import TextAnalyzer
 from services.sms_analyzer import SMSAnalyzer
 from services.email_analyzer import EmailAnalyzer
 from services.chat_analyzer import ChatAnalyzer
+from services.gemini_analyzer import GeminiAnalyzer
 from services.data_simulator import DataSimulator
 from services.email_data_simulator import EmailDataSimulator
 from models.schemas import (
     TextAnalysisRequest, TextAnalysisResponse,
     EmailAnalysisRequest, EmailAnalysisResponse,
+    AudioAnalysisRequest, AudioAnalysisResponse,
     FraudDetectionResponse, AnalysisResult
 )
 from utils.logger import setup_logger
@@ -50,6 +52,7 @@ text_analyzer = TextAnalyzer()
 sms_analyzer = SMSAnalyzer()
 email_analyzer = EmailAnalyzer()
 chat_analyzer = ChatAnalyzer()
+gemini_analyzer = GeminiAnalyzer()
 data_simulator = DataSimulator()
 email_data_simulator = EmailDataSimulator()
 
@@ -81,6 +84,12 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Chat analyzer initialization failed: {e}")
     
+    try:
+        await gemini_analyzer.initialize()
+        logger.info("Gemini analyzer initialized")
+    except Exception as e:
+        logger.error(f"Gemini analyzer initialization failed: {e}")
+    
     logger.info("AI models initialization completed")
 
 @app.get("/")
@@ -97,7 +106,8 @@ async def health_check():
             "text_analyzer": text_analyzer.is_ready(),
             "sms_analyzer": sms_analyzer.is_ready(),
             "email_analyzer": email_analyzer.is_ready(),
-            "chat_analyzer": chat_analyzer.is_ready()
+            "chat_analyzer": chat_analyzer.is_ready(),
+            "gemini_analyzer": gemini_analyzer.is_ready()
         },
         "timestamp": datetime.utcnow()
     }
@@ -240,6 +250,91 @@ async def analyze_chat(request: TextAnalysisRequest):
     except Exception as e:
         logger.error(f"Chat analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Chat analysis failed: {str(e)}")
+
+# Old audio analyzer endpoint removed - using only Gemini now
+
+# Transcription endpoint removed - using only Gemini now
+
+@app.post("/analyze/audio/gemini", response_model=AudioAnalysisResponse)
+async def analyze_audio_gemini(audio_file: UploadFile = File(...)):
+    """
+    Analyze audio file for deepfake detection using Gemini 2.5 Pro
+    """
+    try:
+        logger.info(f"Analyzing audio file with Gemini: {audio_file.filename}")
+        
+        if not gemini_analyzer.is_ready():
+            raise HTTPException(status_code=503, detail="Gemini analyzer not ready")
+        
+        # Save uploaded file temporarily
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            content = await audio_file.read()
+            tmp_file.write(content)
+            tmp_file_path = tmp_file.name
+        
+        # Analyze audio with Gemini
+        result = await gemini_analyzer.analyze_audio(tmp_file_path)
+        
+        # Clean up temp file
+        os.unlink(tmp_file_path)
+        
+        return AudioAnalysisResponse(
+            analysis_id=result["analysis_id"],
+            channel=result["channel"],
+            risk_score=result["risk_score"],
+            risk_level=result["risk_level"],
+            is_fraud=result["is_fraud"],
+            triggers=result["triggers"],
+            explanation=result["explanation"],
+            confidence=result["confidence"],
+            processing_time=result["processing_time"],
+            timestamp=result["timestamp"],
+            audio_file=result["audio_file"],
+            deepfake_score=result["deepfake_score"],
+            is_deepfake=result["is_deepfake"],
+            audio_metadata=result["audio_metadata"]
+        )
+        
+    except Exception as e:
+        logger.error(f"Gemini audio analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gemini audio analysis failed: {str(e)}")
+
+@app.post("/analyze/video/gemini")
+async def analyze_video_gemini(video_file: UploadFile = File(...)):
+    """
+    Analyze video file for deepfake detection using Gemini 2.5 Pro
+    """
+    try:
+        logger.info(f"Analyzing video file with Gemini: {video_file.filename}")
+        
+        if not gemini_analyzer.is_ready():
+            raise HTTPException(status_code=503, detail="Gemini analyzer not ready")
+        
+        # Save uploaded file temporarily
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
+            content = await video_file.read()
+            tmp_file.write(content)
+            tmp_file_path = tmp_file.name
+        
+        # Analyze video with Gemini
+        result = await gemini_analyzer.analyze_video(tmp_file_path)
+        
+        # Clean up temp file
+        os.unlink(tmp_file_path)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Gemini video analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gemini video analysis failed: {str(e)}")
+
+# Comparison endpoint removed - using only Gemini now
 
 # Voice and video analysis endpoints will be added when those services are implemented
 
@@ -531,6 +626,10 @@ async def get_models_status():
         "chat_analyzer": {
             "ready": chat_analyzer.is_ready(),
             "model_name": chat_analyzer.get_model_info()
+        },
+        "gemini_analyzer": {
+            "ready": gemini_analyzer.is_ready(),
+            "model_name": gemini_analyzer.get_model_info()
         },
         "voice_analyzer": {
             "ready": False,
