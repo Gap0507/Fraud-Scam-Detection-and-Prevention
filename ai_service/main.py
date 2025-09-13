@@ -11,6 +11,7 @@ import logging
 from typing import List, Dict, Any, Optional
 import asyncio
 from datetime import datetime
+import re
 
 from services.text_analyzer import TextAnalyzer
 from services.sms_analyzer import SMSAnalyzer
@@ -335,6 +336,179 @@ async def simulate_communication_data(
     except Exception as e:
         logger.error(f"Data simulation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Data simulation failed: {str(e)}")
+
+@app.post("/analyze/unified")
+async def analyze_unified(request: dict):
+    """
+    Unified analysis endpoint that automatically detects content type and analyzes accordingly.
+    Just paste any content and it will smartly detect if it's SMS, Email, or Chat.
+    """
+    try:
+        content = request.get("content", "").strip()
+        sender_info = request.get("sender_info", "")
+        
+        if not content:
+            raise HTTPException(
+                status_code=400,
+                detail="Content is required"
+            )
+        
+        # Smart content type detection
+        detected_type = detect_content_type(content)
+        
+        # Analyze based on detected type
+        if detected_type == "email":
+            # Parse email content
+            lines = content.split('\n')
+            subject = lines[0] if lines else "No Subject"
+            body = '\n'.join(lines[1:]) if len(lines) > 1 else content
+            
+            analysis = await email_analyzer.analyze_email(
+                subject=subject,
+                body=body,
+                sender_email=sender_info
+            )
+            analysis["detected_type"] = "email"
+            
+        elif detected_type == "chat":
+            # Parse chat content
+            try:
+                # Try to parse as JSON array of messages
+                import json
+                messages = json.loads(content)
+                if isinstance(messages, list):
+                    chat_messages = messages
+                else:
+                    chat_messages = [content]
+            except:
+                # If not JSON, treat as single message
+                chat_messages = [content]
+            
+            analysis = await chat_analyzer.analyze_chat(
+                messages=chat_messages,
+                sender_info=sender_info
+            )
+            analysis["detected_type"] = "chat"
+            
+        else:  # SMS or general text
+            analysis = await sms_analyzer.analyze_sms(
+                message=content,
+                sender_number=sender_info
+            )
+            analysis["detected_type"] = "sms"
+        
+        # Add unified response format
+        analysis["unified_analysis"] = True
+        analysis["detection_confidence"] = get_detection_confidence(content, detected_type)
+        
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Unified analysis error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Analysis failed: {str(e)}"
+        )
+
+def detect_content_type(content: str) -> str:
+    """
+    Smart content type detection based on patterns and structure.
+    Returns: 'email', 'chat', or 'sms'
+    """
+    content_lower = content.lower()
+    
+    # Email detection patterns
+    email_patterns = [
+        r'^subject\s*:',  # Subject: line
+        r'^from\s*:',     # From: line
+               r'^to\s*:',       # To: line
+        r'^cc\s*:',       # CC: line
+        r'^bcc\s*:',      # BCC: line
+        r'^reply-to\s*:', # Reply-To: line
+        r'@\w+\.\w+',     # Email addresses
+        r'^dear\s+\w+',   # Dear [Name] greeting
+        r'^sincerely',    # Email signature
+        r'^best regards', # Email signature
+        r'^yours truly',  # Email signature
+    ]
+    
+    # Chat detection patterns
+    chat_patterns = [
+        r'^\s*\[.*?\]\s*',  # [timestamp] or [username]
+        r'^\w+:\s*',        # username: message
+        r'^\d{1,2}:\d{2}\s*',  # time format
+        r'^\d{1,2}/\d{1,2}/\d{4}',  # date format
+        r'^\w+\s+\d{1,2}:\d{2}',  # day time format
+        r'^\w+\s+\d{1,2}:\d{2}\s+[AP]M',  # day time AM/PM
+    ]
+    
+    # Check for email patterns
+    email_score = 0
+    for pattern in email_patterns:
+        if re.search(pattern, content, re.MULTILINE | re.IGNORECASE):
+            email_score += 1
+    
+    # Check for chat patterns
+    chat_score = 0
+    for pattern in chat_patterns:
+        if re.search(pattern, content, re.MULTILINE | re.IGNORECASE):
+            chat_score += 1
+    
+    # Additional heuristics
+    lines = content.split('\n')
+    
+    # Email heuristics
+    if any(line.strip().startswith(('Subject:', 'From:', 'To:', 'CC:', 'BCC:')) for line in lines[:5]):
+        email_score += 2
+    
+    # Chat heuristics
+    if len(lines) > 1 and any(':' in line and len(line.split(':')[0]) < 20 for line in lines[:3]):
+        chat_score += 2
+    
+    # Length-based detection
+    if len(content) > 1000:  # Long content is likely email
+        email_score += 1
+    elif len(content) < 200:  # Short content is likely SMS
+        email_score -= 1
+    
+    # Decision logic
+    if email_score >= 2:
+        return "email"
+    elif chat_score >= 2:
+        return "chat"
+    else:
+        return "sms"  # Default to SMS for short, simple content
+
+def get_detection_confidence(content: str, detected_type: str) -> float:
+    """Calculate confidence score for content type detection"""
+    confidence = 0.5  # Base confidence
+    
+    if detected_type == "email":
+        # Check for strong email indicators
+        if re.search(r'^subject\s*:', content, re.MULTILINE | re.IGNORECASE):
+            confidence += 0.3
+        if re.search(r'@\w+\.\w+', content):
+            confidence += 0.2
+        if len(content) > 500:
+            confidence += 0.1
+            
+    elif detected_type == "chat":
+        # Check for strong chat indicators
+        if re.search(r'^\w+:\s*', content, re.MULTILINE):
+            confidence += 0.3
+        if re.search(r'^\s*\[.*?\]\s*', content, re.MULTILINE):
+            confidence += 0.2
+        if len(content.split('\n')) > 3:
+            confidence += 0.1
+            
+    else:  # SMS
+        # SMS is default, so lower confidence
+        if len(content) < 200:
+            confidence += 0.2
+        if not re.search(r'@\w+\.\w+', content):  # No email addresses
+            confidence += 0.1
+    
+    return min(confidence, 1.0)
 
 @app.get("/models/status")
 async def get_models_status():
