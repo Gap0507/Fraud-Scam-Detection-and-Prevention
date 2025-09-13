@@ -3,7 +3,7 @@ FraudShield AI Service - Multi-Channel Digital Fraud Detection
 Main FastAPI application with AI endpoints for text, voice, and video analysis
 """
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -13,13 +13,10 @@ import asyncio
 from datetime import datetime
 
 from services.text_analyzer import TextAnalyzer
-from services.voice_analyzer import VoiceAnalyzer
-from services.video_analyzer import VideoAnalyzer
+from services.sms_analyzer import SMSAnalyzer
 from services.data_simulator import DataSimulator
 from models.schemas import (
     TextAnalysisRequest, TextAnalysisResponse,
-    VoiceAnalysisRequest, VoiceAnalysisResponse,
-    VideoAnalysisRequest, VideoAnalysisResponse,
     FraudDetectionResponse, AnalysisResult
 )
 from utils.logger import setup_logger
@@ -45,20 +42,26 @@ app.add_middleware(
 
 # Initialize AI services
 text_analyzer = TextAnalyzer()
-voice_analyzer = VoiceAnalyzer()
-video_analyzer = VideoAnalyzer()
+sms_analyzer = SMSAnalyzer()
 data_simulator = DataSimulator()
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize AI models on startup"""
     logger.info("Initializing AI models...")
-    await asyncio.gather(
-        text_analyzer.initialize(),
-        voice_analyzer.initialize(),
-        video_analyzer.initialize()
-    )
-    logger.info("AI models initialized successfully")
+    try:
+        await text_analyzer.initialize()
+        logger.info("Text analyzer initialized")
+    except Exception as e:
+        logger.error(f"Text analyzer initialization failed: {e}")
+    
+    try:
+        await sms_analyzer.initialize()
+        logger.info("SMS analyzer initialized")
+    except Exception as e:
+        logger.error(f"SMS analyzer initialization failed: {e}")
+    
+    logger.info("AI models initialization completed")
 
 @app.get("/")
 async def root():
@@ -72,8 +75,7 @@ async def health_check():
         "status": "healthy",
         "services": {
             "text_analyzer": text_analyzer.is_ready(),
-            "voice_analyzer": voice_analyzer.is_ready(),
-            "video_analyzer": video_analyzer.is_ready()
+            "sms_analyzer": sms_analyzer.is_ready()
         },
         "timestamp": datetime.utcnow()
     }
@@ -87,11 +89,35 @@ async def analyze_text(request: TextAnalysisRequest):
     try:
         logger.info(f"Analyzing text: {request.content[:100]}...")
         
-        result = await text_analyzer.analyze(
-            content=request.content,
-            channel=request.channel,
-            sender_info=request.sender_info
-        )
+        # Always use SMS analyzer for SMS messages
+        if request.channel == "sms":
+            if not sms_analyzer.is_ready():
+                raise HTTPException(status_code=503, detail="SMS analyzer not ready")
+            
+            result = await sms_analyzer.analyze_sms(
+                message=request.content,
+                sender_number=request.sender_info
+            )
+            # Convert SMS result to text analysis format
+            result = {
+                "analysis_id": result["analysis_id"],
+                "channel": "sms",
+                "risk_score": result["risk_score"],
+                "risk_level": result["risk_level"],
+                "is_fraud": result["is_scam"],
+                "triggers": result["triggers"],
+                "explanation": result["explanation"],
+                "highlighted_tokens": result["highlighted_tokens"],
+                "confidence": result["confidence"],
+                "processing_time": result["processing_time"],
+                "timestamp": result["timestamp"]
+            }
+        else:
+            result = await text_analyzer.analyze(
+                content=request.content,
+                channel=request.channel,
+                sender_info=request.sender_info
+            )
         
         return TextAnalysisResponse(
             analysis_id=result["analysis_id"],
@@ -111,101 +137,17 @@ async def analyze_text(request: TextAnalysisRequest):
         logger.error(f"Text analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Text analysis failed: {str(e)}")
 
-@app.post("/analyze/voice", response_model=VoiceAnalysisResponse)
-async def analyze_voice(
-    audio_file: UploadFile = File(...),
-    caller_id: Optional[str] = Form(None),
-    call_duration: Optional[float] = Form(None)
-):
-    """
-    Analyze voice content for fraud indicators
-    Supports call recordings, voicemail, and voice messages
-    """
-    try:
-        logger.info(f"Analyzing voice file: {audio_file.filename}")
-        
-        # Save uploaded file temporarily
-        audio_content = await audio_file.read()
-        
-        result = await voice_analyzer.analyze(
-            audio_content=audio_content,
-            filename=audio_file.filename,
-            caller_id=caller_id,
-            call_duration=call_duration
-        )
-        
-        return VoiceAnalysisResponse(
-            analysis_id=result["analysis_id"],
-            channel="voice",
-            risk_score=result["risk_score"],
-            risk_level=result["risk_level"],
-            is_fraud=result["is_fraud"],
-            transcript=result["transcript"],
-            spoof_score=result["spoof_score"],
-            voice_quality=result["voice_quality"],
-            triggers=result["triggers"],
-            explanation=result["explanation"],
-            confidence=result["confidence"],
-            processing_time=result["processing_time"],
-            timestamp=result["timestamp"]
-        )
-        
-    except Exception as e:
-        logger.error(f"Voice analysis error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Voice analysis failed: {str(e)}")
-
-@app.post("/analyze/video", response_model=VideoAnalysisResponse)
-async def analyze_video(
-    video_file: UploadFile = File(...),
-    caller_id: Optional[str] = Form(None)
-):
-    """
-    Analyze video content for deepfake and fraud indicators
-    Supports video calls, recorded videos, and live streams
-    """
-    try:
-        logger.info(f"Analyzing video file: {video_file.filename}")
-        
-        # Save uploaded file temporarily
-        video_content = await video_file.read()
-        
-        result = await video_analyzer.analyze(
-            video_content=video_content,
-            filename=video_file.filename,
-            caller_id=caller_id
-        )
-        
-        return VideoAnalysisResponse(
-            analysis_id=result["analysis_id"],
-            channel="video",
-            risk_score=result["risk_score"],
-            risk_level=result["risk_level"],
-            is_fraud=result["is_fraud"],
-            deepfake_score=result["deepfake_score"],
-            face_analysis=result["face_analysis"],
-            lip_sync_score=result["lip_sync_score"],
-            blink_analysis=result["blink_analysis"],
-            triggers=result["triggers"],
-            explanation=result["explanation"],
-            confidence=result["confidence"],
-            processing_time=result["processing_time"],
-            timestamp=result["timestamp"]
-        )
-        
-    except Exception as e:
-        logger.error(f"Video analysis error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Video analysis failed: {str(e)}")
+# Voice and video analysis endpoints will be added when those services are implemented
 
 @app.post("/analyze/multi-channel", response_model=FraudDetectionResponse)
 async def analyze_multi_channel(
     text_content: Optional[str] = Form(None),
-    audio_file: Optional[UploadFile] = File(None),
-    video_file: Optional[UploadFile] = File(None),
     channel: str = Form("multi"),
     sender_info: Optional[str] = Form(None)
 ):
     """
-    Analyze multiple channels simultaneously for comprehensive fraud detection
+    Analyze text content for comprehensive fraud detection
+    (Voice and video analysis will be added when those services are implemented)
     """
     try:
         logger.info("Starting multi-channel analysis")
@@ -223,30 +165,6 @@ async def analyze_multi_channel(
             )
             results.append(text_result)
             overall_risk_score += text_result["risk_score"]
-            channel_count += 1
-        
-        # Analyze audio if provided
-        if audio_file:
-            audio_content = await audio_file.read()
-            voice_result = await voice_analyzer.analyze(
-                audio_content=audio_content,
-                filename=audio_file.filename,
-                caller_id=sender_info
-            )
-            results.append(voice_result)
-            overall_risk_score += voice_result["risk_score"]
-            channel_count += 1
-        
-        # Analyze video if provided
-        if video_file:
-            video_content = await video_file.read()
-            video_result = await video_analyzer.analyze(
-                video_content=video_content,
-                filename=video_file.filename,
-                caller_id=sender_info
-            )
-            results.append(video_result)
-            overall_risk_score += video_result["risk_score"]
             channel_count += 1
         
         # Calculate overall risk score
@@ -284,7 +202,7 @@ async def analyze_multi_channel(
 @app.get("/simulate/data")
 async def simulate_communication_data(
     count: int = 10,
-    channel: str = "all"
+    channel: str = "sms"
 ):
     """
     Generate simulated communication data for testing
@@ -292,10 +210,13 @@ async def simulate_communication_data(
     try:
         logger.info(f"Generating {count} simulated {channel} communications")
         
-        data = await data_simulator.generate_data(
-            count=count,
-            channel=channel
-        )
+        if channel == "sms" or channel == "all":
+            data = await data_simulator.generate_sms_data(
+                count=count,
+                scam_ratio=0.5
+            )
+        else:
+            data = []
         
         return {
             "message": f"Generated {len(data)} simulated communications",
@@ -317,13 +238,17 @@ async def get_models_status():
             "ready": text_analyzer.is_ready(),
             "model_name": text_analyzer.get_model_info()
         },
+        "sms_analyzer": {
+            "ready": sms_analyzer.is_ready(),
+            "model_name": sms_analyzer.get_model_info()
+        },
         "voice_analyzer": {
-            "ready": voice_analyzer.is_ready(),
-            "model_name": voice_analyzer.get_model_info()
+            "ready": False,
+            "model_name": "Not implemented yet"
         },
         "video_analyzer": {
-            "ready": video_analyzer.is_ready(),
-            "model_name": video_analyzer.get_model_info()
+            "ready": False,
+            "model_name": "Not implemented yet"
         }
     }
 

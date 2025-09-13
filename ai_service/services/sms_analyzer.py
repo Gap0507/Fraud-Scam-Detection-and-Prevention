@@ -214,10 +214,16 @@ class SMSAnalyzer:
             labels = ["spam", "scam", "fraud", "legitimate"]
             result = self.zero_shot_classifier(message, candidate_labels=labels)
             
+            predicted_label = result["labels"][0]
+            confidence = result["scores"][0]
+            is_spam = predicted_label in ["spam", "scam", "fraud"]
+            
+            print(f"DEBUG: Zero-shot result - Label: {predicted_label}, Confidence: {confidence:.3f}, Is Spam: {is_spam}")
+            
             return {
-                "predicted_label": result["labels"][0],
-                "confidence": result["scores"][0],
-                "is_spam": result["labels"][0] in ["spam", "scam", "fraud"]
+                "predicted_label": predicted_label,
+                "confidence": confidence,
+                "is_spam": is_spam
             }
             
         except Exception as e:
@@ -337,8 +343,11 @@ class SMSAnalyzer:
             "sender_analysis": 0.1
         }
         
-        # Spam classification score
-        spam_score = spam_classification["confidence"] if spam_classification["is_spam"] else 0.0
+        # Spam classification score - use confidence if spam detected, otherwise 0
+        if spam_classification["is_spam"]:
+            spam_score = spam_classification["confidence"]
+        else:
+            spam_score = 0.0
         
         # Pattern analysis score
         pattern_score = pattern_analysis["total_pattern_score"]
@@ -349,6 +358,8 @@ class SMSAnalyzer:
         # Sender analysis score
         sender_score = sender_analysis["score"]
         
+        print(f"DEBUG: Risk calculation - Spam: {spam_score:.3f} (is_spam: {spam_classification['is_spam']}), Pattern: {pattern_score:.3f}, Statistical: {statistical_score:.3f}, Sender: {sender_score:.3f}")
+        
         # Calculate weighted average
         risk_score = (
             weights["spam_classification"] * spam_score +
@@ -357,14 +368,15 @@ class SMSAnalyzer:
             weights["sender_analysis"] * sender_score
         )
         
+        print(f"DEBUG: Final risk score: {risk_score:.3f}")
         return min(risk_score, 1.0)
     
     def _determine_risk_level(self, risk_score: float) -> Tuple[str, bool]:
         """Determine risk level and scam status"""
-        if risk_score >= 0.8:
+        if risk_score >= 0.4:  # Lowered threshold
             return "HIGH", True
-        elif risk_score >= 0.5:
-            return "MEDIUM", False
+        elif risk_score >= 0.2:
+            return "MEDIUM", True  # Medium is also scam
         else:
             return "LOW", False
     
