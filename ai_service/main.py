@@ -14,9 +14,12 @@ from datetime import datetime
 
 from services.text_analyzer import TextAnalyzer
 from services.sms_analyzer import SMSAnalyzer
+from services.email_analyzer import EmailAnalyzer
 from services.data_simulator import DataSimulator
+from services.email_data_simulator import EmailDataSimulator
 from models.schemas import (
     TextAnalysisRequest, TextAnalysisResponse,
+    EmailAnalysisRequest, EmailAnalysisResponse,
     FraudDetectionResponse, AnalysisResult
 )
 from utils.logger import setup_logger
@@ -43,7 +46,9 @@ app.add_middleware(
 # Initialize AI services
 text_analyzer = TextAnalyzer()
 sms_analyzer = SMSAnalyzer()
+email_analyzer = EmailAnalyzer()
 data_simulator = DataSimulator()
+email_data_simulator = EmailDataSimulator()
 
 @app.on_event("startup")
 async def startup_event():
@@ -61,6 +66,12 @@ async def startup_event():
     except Exception as e:
         logger.error(f"SMS analyzer initialization failed: {e}")
     
+    try:
+        await email_analyzer.initialize()
+        logger.info("Email analyzer initialized")
+    except Exception as e:
+        logger.error(f"Email analyzer initialization failed: {e}")
+    
     logger.info("AI models initialization completed")
 
 @app.get("/")
@@ -75,7 +86,8 @@ async def health_check():
         "status": "healthy",
         "services": {
             "text_analyzer": text_analyzer.is_ready(),
-            "sms_analyzer": sms_analyzer.is_ready()
+            "sms_analyzer": sms_analyzer.is_ready(),
+            "email_analyzer": email_analyzer.is_ready()
         },
         "timestamp": datetime.utcnow()
     }
@@ -136,6 +148,45 @@ async def analyze_text(request: TextAnalysisRequest):
     except Exception as e:
         logger.error(f"Text analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Text analysis failed: {str(e)}")
+
+@app.post("/analyze/email", response_model=EmailAnalysisResponse)
+async def analyze_email(request: EmailAnalysisRequest):
+    """
+    Analyze email content for phishing indicators
+    """
+    try:
+        logger.info(f"Analyzing email: {request.subject[:50]}...")
+        
+        if not email_analyzer.is_ready():
+            raise HTTPException(status_code=503, detail="Email analyzer not ready")
+        
+        result = await email_analyzer.analyze_email(
+            subject=request.subject,
+            body=request.body,
+            sender_email=request.sender_email
+        )
+        
+        return EmailAnalysisResponse(
+            analysis_id=result["analysis_id"],
+            channel=result["channel"],
+            subject=result["subject"],
+            body=result["body"],
+            risk_score=result["risk_score"],
+            risk_level=result["risk_level"],
+            is_fraud=result["is_phishing"],
+            triggers=result["triggers"],
+            explanation=result["explanation"],
+            highlighted_tokens=result["highlighted_tokens"],
+            suspicious_links=result["detailed_analysis"]["link_analysis"]["suspicious_links"],
+            confidence=result["confidence"],
+            processing_time=result["processing_time"],
+            timestamp=result["timestamp"],
+            detailed_analysis=result["detailed_analysis"]
+        )
+        
+    except Exception as e:
+        logger.error(f"Email analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Email analysis failed: {str(e)}")
 
 # Voice and video analysis endpoints will be added when those services are implemented
 
@@ -215,6 +266,11 @@ async def simulate_communication_data(
                 count=count,
                 scam_ratio=0.5
             )
+        elif channel == "email" or channel == "all":
+            data = await email_data_simulator.generate_email_data(
+                count=count,
+                phishing_ratio=0.5
+            )
         else:
             data = []
         
@@ -241,6 +297,10 @@ async def get_models_status():
         "sms_analyzer": {
             "ready": sms_analyzer.is_ready(),
             "model_name": sms_analyzer.get_model_info()
+        },
+        "email_analyzer": {
+            "ready": email_analyzer.is_ready(),
+            "model_name": email_analyzer.get_model_info()
         },
         "voice_analyzer": {
             "ready": False,

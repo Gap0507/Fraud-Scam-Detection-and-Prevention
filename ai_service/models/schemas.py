@@ -32,16 +32,12 @@ class TextAnalysisRequest(AnalysisRequest):
     channel: ChannelType = Field(ChannelType.SMS, description="Text channel type")
     sender_info: Optional[str] = Field(None, description="Sender phone number or email")
 
-class VoiceAnalysisRequest(BaseModel):
-    """Voice analysis request"""
-    audio_file: str = Field(..., description="Audio file path or content")
-    caller_id: Optional[str] = Field(None, description="Caller ID or phone number")
-    call_duration: Optional[float] = Field(None, description="Call duration in seconds")
-
-class VideoAnalysisRequest(BaseModel):
-    """Video analysis request"""
-    video_file: str = Field(..., description="Video file path or content")
-    caller_id: Optional[str] = Field(None, description="Caller ID or phone number")
+class EmailAnalysisRequest(BaseModel):
+    """Email analysis request"""
+    subject: str = Field(..., description="Email subject", min_length=1, max_length=500)
+    body: str = Field(..., description="Email body content", min_length=1, max_length=50000)
+    sender_email: Optional[str] = Field(None, description="Sender email address")
+    channel: ChannelType = Field(ChannelType.EMAIL, description="Communication channel")
 
 class HighlightedToken(BaseModel):
     """Highlighted token for UI display"""
@@ -63,6 +59,25 @@ class AnalysisResult(BaseModel):
     confidence: float = Field(..., description="Confidence score (0.0 to 1.0)", ge=0.0, le=1.0)
     processing_time: float = Field(..., description="Processing time in seconds")
     timestamp: str = Field(..., description="Analysis timestamp")
+
+class EmailAnalysisResponse(AnalysisResult):
+    """Email analysis response"""
+    subject: str = Field(..., description="Email subject")
+    body: str = Field(..., description="Email body content")
+    highlighted_tokens: List[HighlightedToken] = Field(..., description="Tokens to highlight in UI")
+    suspicious_links: List[Dict[str, Any]] = Field(default=[], description="Suspicious links found")
+    detailed_analysis: Optional[Dict[str, Any]] = Field(None, description="Detailed analysis breakdown")
+
+class VoiceAnalysisRequest(BaseModel):
+    """Voice analysis request"""
+    audio_file: str = Field(..., description="Audio file path or content")
+    caller_id: Optional[str] = Field(None, description="Caller ID or phone number")
+    call_duration: Optional[float] = Field(None, description="Call duration in seconds")
+
+class VideoAnalysisRequest(BaseModel):
+    """Video analysis request"""
+    video_file: str = Field(..., description="Video file path or content")
+    caller_id: Optional[str] = Field(None, description="Caller ID or phone number")
 
 class TextAnalysisResponse(AnalysisResult):
     """Text analysis response"""
@@ -97,6 +112,16 @@ class SMSMessage(BaseModel):
     is_scam: bool = Field(..., description="Whether message is a scam")
     scam_type: Optional[str] = Field(None, description="Type of scam if applicable")
     channel: str = Field("sms", description="Communication channel")
+
+class EmailMessage(BaseModel):
+    """Email message structure"""
+    subject: str = Field(..., description="Email subject")
+    body: str = Field(..., description="Email body content")
+    sender: str = Field(..., description="Sender email address")
+    timestamp: str = Field(..., description="Message timestamp")
+    is_phishing: bool = Field(..., description="Whether email is phishing")
+    phishing_type: Optional[str] = Field(None, description="Type of phishing if applicable")
+    channel: str = Field("email", description="Communication channel")
 
 class DatasetStatistics(BaseModel):
     """Dataset statistics"""
