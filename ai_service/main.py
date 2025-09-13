@@ -15,6 +15,7 @@ from datetime import datetime
 from services.text_analyzer import TextAnalyzer
 from services.sms_analyzer import SMSAnalyzer
 from services.email_analyzer import EmailAnalyzer
+from services.chat_analyzer import ChatAnalyzer
 from services.data_simulator import DataSimulator
 from services.email_data_simulator import EmailDataSimulator
 from models.schemas import (
@@ -47,6 +48,7 @@ app.add_middleware(
 text_analyzer = TextAnalyzer()
 sms_analyzer = SMSAnalyzer()
 email_analyzer = EmailAnalyzer()
+chat_analyzer = ChatAnalyzer()
 data_simulator = DataSimulator()
 email_data_simulator = EmailDataSimulator()
 
@@ -72,6 +74,12 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Email analyzer initialization failed: {e}")
     
+    try:
+        await chat_analyzer.initialize()
+        logger.info("Chat analyzer initialized")
+    except Exception as e:
+        logger.error(f"Chat analyzer initialization failed: {e}")
+    
     logger.info("AI models initialization completed")
 
 @app.get("/")
@@ -87,7 +95,8 @@ async def health_check():
         "services": {
             "text_analyzer": text_analyzer.is_ready(),
             "sms_analyzer": sms_analyzer.is_ready(),
-            "email_analyzer": email_analyzer.is_ready()
+            "email_analyzer": email_analyzer.is_ready(),
+            "chat_analyzer": chat_analyzer.is_ready()
         },
         "timestamp": datetime.utcnow()
     }
@@ -187,6 +196,49 @@ async def analyze_email(request: EmailAnalysisRequest):
     except Exception as e:
         logger.error(f"Email analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Email analysis failed: {str(e)}")
+
+@app.post("/analyze/chat", response_model=TextAnalysisResponse)
+async def analyze_chat(request: TextAnalysisRequest):
+    """
+    Analyze chat conversation for scam indicators
+    """
+    try:
+        logger.info(f"Analyzing chat: {request.content[:100]}...")
+        
+        if not chat_analyzer.is_ready():
+            raise HTTPException(status_code=503, detail="Chat analyzer not ready")
+        
+        # For chat analysis, we expect the content to be a JSON string of messages
+        import json
+        try:
+            messages = json.loads(request.content)
+            if not isinstance(messages, list):
+                messages = [request.content]  # Fallback to single message
+        except:
+            messages = [request.content]  # Fallback to single message
+        
+        result = await chat_analyzer.analyze_chat(
+            messages=messages,
+            sender_info=request.sender_info
+        )
+        
+        return TextAnalysisResponse(
+            analysis_id=result["analysis_id"],
+            channel="chat",
+            risk_score=result["risk_score"],
+            risk_level=result["risk_level"],
+            is_fraud=result["is_scam"],
+            triggers=result["triggers"],
+            explanation=result["explanation"],
+            highlighted_tokens=result["highlighted_tokens"],
+            confidence=result["confidence"],
+            processing_time=result["processing_time"],
+            timestamp=result["timestamp"]
+        )
+        
+    except Exception as e:
+        logger.error(f"Chat analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chat analysis failed: {str(e)}")
 
 # Voice and video analysis endpoints will be added when those services are implemented
 
@@ -301,6 +353,10 @@ async def get_models_status():
         "email_analyzer": {
             "ready": email_analyzer.is_ready(),
             "model_name": email_analyzer.get_model_info()
+        },
+        "chat_analyzer": {
+            "ready": chat_analyzer.is_ready(),
+            "model_name": chat_analyzer.get_model_info()
         },
         "voice_analyzer": {
             "ready": False,
