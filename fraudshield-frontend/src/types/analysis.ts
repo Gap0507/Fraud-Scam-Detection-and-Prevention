@@ -14,6 +14,27 @@ export interface SuspiciousLink {
   reasons: string[]
 }
 
+export interface GeminiExplanation {
+  executive_summary: string
+  detailed_explanation: string
+  technical_insights: string
+  immediate_actions: string[]
+  prevention_tips: string[]
+  confidence_assessment: string
+  risk_breakdown: {
+    primary_concerns: string[]
+    secondary_concerns: string[]
+    mitigating_factors: string[]
+  }
+  next_steps: {
+    immediate: string
+    short_term: string
+    long_term: string
+  }
+  generated_at: string
+  model_used: string
+}
+
 export interface DetailedAnalysis {
   phishing_classification?: {
     predicted_label: string
@@ -89,6 +110,18 @@ export interface AnalysisResponse {
   processing_time: number
   timestamp: string
   detailed_analysis?: DetailedAnalysis
+  gemini_explanation?: GeminiExplanation
+  human_friendly_triggers?: string[]
+  next_steps?: {
+    immediate: string
+    short_term: string
+    long_term: string
+  }
+  risk_breakdown?: {
+    primary_concerns: string[]
+    secondary_concerns: string[]
+    mitigating_factors: string[]
+  }
 }
 
 export interface EmailAnalysisResponse extends AnalysisResponse {

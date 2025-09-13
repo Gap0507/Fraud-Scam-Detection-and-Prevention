@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { XMarkIcon, ExclamationTriangleIcon, CheckCircleIcon, InformationCircleIcon } from '@heroicons/react/24/outline'
 import { AnalysisResponse, EmailAnalysisResponse, ChatAnalysisResponse } from '@/types/analysis'
 import { getRiskLevelColor, getConfidenceColor } from '@/services/api'
@@ -13,7 +12,6 @@ interface AnalysisModalProps {
 }
 
 export default function AnalysisModal({ isOpen, onClose, analysis, messageType }: AnalysisModalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'tokens'>('overview')
 
   if (!isOpen) return null
 
@@ -137,195 +135,7 @@ export default function AnalysisModal({ isOpen, onClose, analysis, messageType }
     </div>
   )
 
-  const renderDetails = () => {
-    if (!analysis.detailed_analysis) {
-      return (
-        <div className="text-center py-8">
-          <p className="text-gray-400">No detailed analysis available</p>
-        </div>
-      )
-    }
 
-    const details = analysis.detailed_analysis
-
-    return (
-      <div className="space-y-6">
-        {/* Pattern Analysis */}
-        {details.pattern_analysis && (
-          <div className="bg-[#0D1117] rounded-lg p-4 border border-[#21262d]">
-            <h3 className="text-lg font-semibold text-white mb-3">Pattern Analysis</h3>
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm text-gray-400">Overall Pattern Score</p>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-700 rounded-full h-2">
-                    <div 
-                      className="bg-[var(--accent-teal)] h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${details.pattern_analysis.total_pattern_score * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-white text-sm font-medium">
-                    {(details.pattern_analysis.total_pattern_score * 100).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-              {details.pattern_analysis.high_risk_categories.length > 0 && (
-                <div>
-                  <p className="text-sm text-gray-400 mb-2">High-Risk Categories</p>
-                  <div className="flex flex-wrap gap-2">
-                    {details.pattern_analysis.high_risk_categories.map((category, index) => (
-                      <span
-                        key={index}
-                        className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded border border-red-500/30"
-                      >
-                        {category.replace('_', ' ')}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Statistical Analysis */}
-        {details.statistical_analysis && (
-          <div className="bg-[#0D1117] rounded-lg p-4 border border-[#21262d]">
-            <h3 className="text-lg font-semibold text-white mb-3">Statistical Analysis</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-gray-400">Length</p>
-                <p className="text-white font-medium">{details.statistical_analysis.length} chars</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Word Count</p>
-                <p className="text-white font-medium">{details.statistical_analysis.word_count}</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Uppercase Ratio</p>
-                <p className="text-white font-medium">{(details.statistical_analysis.uppercase_ratio * 100).toFixed(1)}%</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Special Chars</p>
-                <p className="text-white font-medium">{(details.statistical_analysis.special_char_ratio * 100).toFixed(1)}%</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Sender Analysis */}
-        {details.sender_analysis && (
-          <div className="bg-[#0D1117] rounded-lg p-4 border border-[#21262d]">
-            <h3 className="text-lg font-semibold text-white mb-3">Sender Analysis</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Reputation</span>
-                <span className={`font-medium ${
-                  details.sender_analysis.reputation === 'suspicious' ? 'text-red-400' :
-                  details.sender_analysis.reputation === 'legitimate' ? 'text-green-400' :
-                  'text-yellow-400'
-                }`}>
-                  {details.sender_analysis.reputation}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Score</span>
-                <span className="text-white font-medium">{(details.sender_analysis.score * 100).toFixed(1)}%</span>
-              </div>
-              {details.sender_analysis.reasons.length > 0 && (
-                <div>
-                  <p className="text-gray-400 text-sm mb-1">Reasons</p>
-                  <ul className="text-sm text-gray-300 space-y-1">
-                    {details.sender_analysis.reasons.map((reason, index) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <span className="text-gray-500">•</span>
-                        <span>{reason}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Sentiment Analysis (for chat) */}
-        {details.sentiment_analysis && (
-          <div className="bg-[#0D1117] rounded-lg p-4 border border-[#21262d]">
-            <h3 className="text-lg font-semibold text-white mb-3">Sentiment Analysis</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Overall Sentiment</span>
-                <span className={`font-medium ${
-                  details.sentiment_analysis.sentiment === 'positive' ? 'text-green-400' :
-                  details.sentiment_analysis.sentiment === 'negative' ? 'text-red-400' :
-                  'text-yellow-400'
-                }`}>
-                  {details.sentiment_analysis.sentiment}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-400">Positive</p>
-                  <p className="text-green-400 font-medium">{(details.sentiment_analysis.positive_ratio * 100).toFixed(1)}%</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Negative</p>
-                  <p className="text-red-400 font-medium">{(details.sentiment_analysis.negative_ratio * 100).toFixed(1)}%</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Neutral</p>
-                  <p className="text-yellow-400 font-medium">{(details.sentiment_analysis.neutral_ratio * 100).toFixed(1)}%</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const renderTokens = () => (
-    <div className="space-y-4">
-      {analysis.highlighted_tokens.length > 0 ? (
-        <div className="space-y-3">
-          {analysis.highlighted_tokens.map((token, index) => (
-            <div
-              key={index}
-              className={`p-3 rounded-lg border ${
-                token.risk_level === 'high' 
-                  ? 'bg-red-500/10 border-red-500/30' 
-                  : 'bg-yellow-500/10 border-yellow-500/30'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-mono text-white">{token.text}</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    token.risk_level === 'high' 
-                      ? 'bg-red-500/20 text-red-400' 
-                      : 'bg-yellow-500/20 text-yellow-400'
-                  }`}>
-                    {token.risk_level}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {token.category.replace('_', ' ')}
-                  </span>
-                </div>
-              </div>
-              <p className="text-sm text-gray-400">
-                Position: {token.start} - {token.end}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-8">
-          <p className="text-gray-400">No highlighted tokens found</p>
-        </div>
-      )}
-    </div>
-  )
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -357,34 +167,10 @@ export default function AnalysisModal({ isOpen, onClose, analysis, messageType }
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="border-b border-[#21262d]">
-          <nav className="flex space-x-8 px-6">
-            {[
-              { id: 'overview', label: 'Overview' },
-              { id: 'details', label: 'Detailed Analysis' },
-              { id: 'tokens', label: 'Highlighted Tokens' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-[var(--accent-teal)] text-[var(--accent-teal)]'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
 
         {/* Content */}
         <div className="flex-1 p-6 overflow-y-auto">
-          {activeTab === 'overview' && renderOverview()}
-          {activeTab === 'details' && renderDetails()}
-          {activeTab === 'tokens' && renderTokens()}
+          {renderOverview()}
         </div>
 
         {/* Footer */}

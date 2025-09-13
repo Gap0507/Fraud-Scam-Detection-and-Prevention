@@ -5,6 +5,7 @@ import { XMarkIcon, PaperAirplaneIcon, ChatBubbleLeftRightIcon, ExclamationTrian
 import { apiService, getRiskLevelColor, getConfidenceColor } from '@/services/api'
 import { AnalysisResponse, EmailAnalysisResponse, ChatAnalysisResponse, ApiError } from '@/types/analysis'
 import AnalysisModal from './AnalysisModal'
+import TypingAnimation from './TypingAnimation'
 
 interface ChatMessage {
   id: string
@@ -13,6 +14,8 @@ interface ChatMessage {
   timestamp: Date
   analysis?: AnalysisResponse | EmailAnalysisResponse | ChatAnalysisResponse
   isAnalyzing?: boolean
+  isTyping?: boolean
+  fullContent?: string
 }
 
 interface ChatbotModalProps {
@@ -58,13 +61,15 @@ export default function ChatbotModal({ isOpen, onClose }: ChatbotModalProps) {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
   }
 
-  const addAIMessage = (content: string, analysis?: AnalysisResponse | EmailAnalysisResponse | ChatAnalysisResponse) => {
+  const addAIMessage = (content: string, analysis?: AnalysisResponse | EmailAnalysisResponse | ChatAnalysisResponse, isTyping: boolean = false) => {
     const newMessage: ChatMessage = {
       id: generateUniqueId(),
       type: 'ai',
-      content,
+      content: isTyping ? '' : content,
+      fullContent: content,
       timestamp: new Date(),
-      analysis
+      analysis,
+      isTyping
     }
     setMessages(prev => [...prev, newMessage])
   }
@@ -94,61 +99,40 @@ export default function ChatbotModal({ isOpen, onClose }: ChatbotModalProps) {
       // Store the detected type for display
       setDetectedType(analysis.detected_type)
 
-      // Create AI response based on analysis
-      const riskEmoji = analysis.risk_level === 'HIGH' ? '🚨' : 
-                       analysis.risk_level === 'MEDIUM' ? '⚠️' : '✅'
+      // Create clean AI response using Gemini explanation if available
+      let aiResponse = ''
       
-      const confidenceEmoji = analysis.confidence >= 0.8 ? '🎯' : 
-                             analysis.confidence >= 0.6 ? '🤔' : '❓'
-
-      const typeEmoji = analysis.detected_type === 'email' ? '📧' : 
-                       analysis.detected_type === 'chat' ? '💬' : '📱'
-
-      let aiResponse = `${riskEmoji} **Smart Analysis Complete**\n\n`
-      aiResponse += `**Detected Type:** ${typeEmoji} ${analysis.detected_type.toUpperCase()} (${(analysis.detection_confidence * 100).toFixed(1)}% confidence)\n`
-      aiResponse += `**Risk Level:** ${analysis.risk_level} (${(analysis.risk_score * 100).toFixed(1)}%)\n`
-      aiResponse += `**Analysis Confidence:** ${confidenceEmoji} ${(analysis.confidence * 100).toFixed(1)}%\n`
-      aiResponse += `**Fraud Detected:** ${analysis.is_fraud ? 'YES' : 'NO'}\n\n`
-      aiResponse += `**AI Explanation:**\n${analysis.explanation}\n\n`
-
-      if (analysis.triggers.length > 0) {
-        aiResponse += `**Trigger Phrases:** ${analysis.triggers.join(', ')}\n\n`
+      if (analysis.gemini_explanation) {
+        // Use Gemini explanation for clean, concise response
+        const gemini = analysis.gemini_explanation
+        
+        aiResponse = `${gemini.executive_summary} This message was detected as ${analysis.detected_type.toUpperCase()} with ${analysis.risk_level} risk (${(analysis.risk_score * 100).toFixed(1)}% confidence: ${(analysis.confidence * 100).toFixed(1)}%). Click "View Details" for full analysis.`
+      } else {
+        // Fallback to basic explanation if Gemini explanation not available
+        aiResponse = `Analysis complete: ${analysis.detected_type.toUpperCase()} content shows ${analysis.risk_level} risk (${(analysis.risk_score * 100).toFixed(1)}% confidence: ${(analysis.confidence * 100).toFixed(1)}%). Fraud detected: ${analysis.is_fraud ? 'YES' : 'NO'}. Click "View Details" for full analysis.`
       }
 
-      if (analysis.highlighted_tokens.length > 0) {
-        aiResponse += `**Suspicious Elements:** ${analysis.highlighted_tokens.length} detected\n\n`
-      }
-
-      aiResponse += `**Processing Time:** ${(analysis.processing_time * 1000).toFixed(0)}ms\n\n`
-      aiResponse += `Click "View Details" below for comprehensive analysis.`
-
-      addAIMessage(aiResponse, analysis)
+      // Add AI message with typing animation
+      addAIMessage(aiResponse, analysis, true)
 
     } catch (error) {
       console.error('Analysis failed:', error)
       
-      let errorMessage = "❌ **Analysis Failed**\n\n"
+      let errorMessage = "Analysis failed. "
       
       if (error && typeof error === 'object' && 'status' in error) {
         const apiError = error as ApiError
-        errorMessage += `**Error:** ${apiError.message}\n`
+        errorMessage += `${apiError.message}. `
         if (apiError.status === 503) {
-          errorMessage += "**Issue:** Backend service is not ready. Please try again in a moment.\n"
+          errorMessage += "Backend service is not ready. Please try again in a moment."
         } else if (apiError.status >= 500) {
-          errorMessage += "**Issue:** Server error occurred. Please try again.\n"
+          errorMessage += "Server error occurred. Please try again."
         } else {
-          errorMessage += "**Issue:** Request failed. Please check your input and try again.\n"
+          errorMessage += "Request failed. Please check your input and try again."
         }
       } else {
-        errorMessage += "**Error:** Unable to connect to the analysis service.\n"
-        errorMessage += "**Issue:** Please check if the backend is running on http://localhost:8000\n"
+        errorMessage += "Unable to connect to the analysis service. Please check if the backend is running on http://localhost:8000"
       }
-      
-      errorMessage += "\n**Troubleshooting:**\n"
-      errorMessage += "• Ensure the Python FastAPI backend is running\n"
-      errorMessage += "• Check that all AI models are loaded\n"
-      errorMessage += "• Verify the API endpoint is accessible\n"
-      errorMessage += "• Try again in a few moments"
 
       addAIMessage(errorMessage)
     } finally {
@@ -190,8 +174,8 @@ export default function ChatbotModal({ isOpen, onClose }: ChatbotModalProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-[#010409] border border-[#21262d] rounded-lg w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl">
+      <div className="fixed inset-0 bg-black/50 flex items-start justify-end z-50">
+        <div className="bg-[#010409] border-l border-[#21262d] w-1/2 h-full flex flex-col shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-[#21262d]">
             <div className="flex items-center gap-3">
@@ -201,7 +185,7 @@ export default function ChatbotModal({ isOpen, onClose }: ChatbotModalProps) {
               <div>
                 <h3 className="text-xl font-bold text-white">AI Fraud Detection Assistant</h3>
                 <div className="flex items-center gap-2">
-                  <p className="text-sm text-gray-400">Analyze any text channel for fraud indicators</p>
+                  <p className="text-sm text-gray-400">Detect fraud in SMS, Email, and Chat messages</p>
                   <div className={`w-2 h-2 rounded-full ${
                     backendStatus === 'online' ? 'bg-green-400' :
                     backendStatus === 'offline' ? 'bg-red-400' :
@@ -230,15 +214,15 @@ export default function ChatbotModal({ isOpen, onClose }: ChatbotModalProps) {
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 p-6 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent">
+          <div className="flex-1 p-6 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent" style={{ scrollbarWidth: 'thin', scrollbarColor: 'transparent transparent' }}>
             {messages.length === 0 && (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
                   <div className="w-16 h-16 rounded-full bg-gradient-to-r from-[var(--accent-teal)]/20 to-[var(--accent-teal)]/10 border border-[var(--accent-teal)]/30 flex items-center justify-center mx-auto mb-4">
                     <ChatBubbleLeftRightIcon className="w-8 h-8 text-[var(--accent-teal)]" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-2">AI Chatbot</h3>
-                  <p className="text-gray-400 text-lg">Ready to analyze your content for fraud indicators</p>
+                  <h3 className="text-2xl font-bold text-white mb-2">AI Fraud Detection</h3>
+                  <p className="text-gray-400 text-lg">Analyze SMS, Email, and Chat messages for fraud and scam indicators</p>
                 </div>
               </div>
             )}
@@ -275,7 +259,22 @@ export default function ChatbotModal({ isOpen, onClose }: ChatbotModalProps) {
                     </div>
                     
                     <div className="text-gray-300 whitespace-pre-wrap">
-                      {message.content}
+                      {message.isTyping ? (
+                        <TypingAnimation 
+                          text={message.fullContent || message.content}
+                          speed={20}
+                          onComplete={() => {
+                            // Mark typing as complete
+                            setMessages(prev => prev.map(msg => 
+                              msg.id === message.id 
+                                ? { ...msg, isTyping: false, content: msg.fullContent || msg.content }
+                                : msg
+                            ))
+                          }}
+                        />
+                      ) : (
+                        message.content
+                      )}
                     </div>
                     
                     {message.analysis && (
@@ -333,7 +332,7 @@ export default function ChatbotModal({ isOpen, onClose }: ChatbotModalProps) {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Paste any SMS, Email, or Chat content here for smart AI analysis..."
+                placeholder="Paste any SMS, Email, or Chat content here for fraud detection analysis..."
                 className="flex-1 min-h-[60px] p-3 bg-[#0D1117] border border-[#21262d] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--accent-teal)] resize-none"
                 disabled={isAnalyzing}
               />

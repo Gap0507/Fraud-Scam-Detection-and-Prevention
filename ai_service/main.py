@@ -18,6 +18,7 @@ from services.sms_analyzer import SMSAnalyzer
 from services.email_analyzer import EmailAnalyzer
 from services.chat_analyzer import ChatAnalyzer
 from services.gemini_analyzer import GeminiAnalyzer
+from services.gemini_explanation_service import GeminiExplanationService
 from services.data_simulator import DataSimulator
 from services.email_data_simulator import EmailDataSimulator
 from models.schemas import (
@@ -53,6 +54,7 @@ sms_analyzer = SMSAnalyzer()
 email_analyzer = EmailAnalyzer()
 chat_analyzer = ChatAnalyzer()
 gemini_analyzer = GeminiAnalyzer()
+gemini_explanation_service = GeminiExplanationService()
 data_simulator = DataSimulator()
 email_data_simulator = EmailDataSimulator()
 
@@ -90,6 +92,12 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Gemini analyzer initialization failed: {e}")
     
+    try:
+        await gemini_explanation_service.initialize()
+        logger.info("Gemini explanation service initialized")
+    except Exception as e:
+        logger.error(f"Gemini explanation service initialization failed: {e}")
+    
     logger.info("AI models initialization completed")
 
 @app.get("/")
@@ -107,7 +115,8 @@ async def health_check():
             "sms_analyzer": sms_analyzer.is_ready(),
             "email_analyzer": email_analyzer.is_ready(),
             "chat_analyzer": chat_analyzer.is_ready(),
-            "gemini_analyzer": gemini_analyzer.is_ready()
+            "gemini_analyzer": gemini_analyzer.is_ready(),
+            "gemini_explanation_service": gemini_explanation_service.is_ready()
         },
         "timestamp": datetime.utcnow()
     }
@@ -151,6 +160,17 @@ async def analyze_text(request: TextAnalysisRequest):
                 sender_info=request.sender_info
             )
         
+        # Add Gemini explanation layer
+        if gemini_explanation_service.is_ready():
+            try:
+                result = await gemini_explanation_service.generate_explanation(
+                    analysis_result=result,
+                    original_content=request.content,
+                    channel=request.channel
+                )
+            except Exception as e:
+                logger.warning(f"Gemini explanation failed, using original result: {str(e)}")
+        
         return TextAnalysisResponse(
             analysis_id=result["analysis_id"],
             channel=result["channel"],
@@ -185,6 +205,19 @@ async def analyze_email(request: EmailAnalysisRequest):
             body=request.body,
             sender_email=request.sender_email
         )
+        
+        # Add Gemini explanation layer
+        if gemini_explanation_service.is_ready():
+            try:
+                # Combine subject and body for Gemini analysis
+                full_content = f"Subject: {request.subject}\n\nBody: {request.body}"
+                result = await gemini_explanation_service.generate_explanation(
+                    analysis_result=result,
+                    original_content=full_content,
+                    channel="email"
+                )
+            except Exception as e:
+                logger.warning(f"Gemini explanation failed, using original result: {str(e)}")
         
         return EmailAnalysisResponse(
             analysis_id=result["analysis_id"],
@@ -232,6 +265,19 @@ async def analyze_chat(request: TextAnalysisRequest):
             messages=messages,
             sender_info=request.sender_info
         )
+        
+        # Add Gemini explanation layer
+        if gemini_explanation_service.is_ready():
+            try:
+                # Convert messages to readable format for Gemini
+                chat_content = "\n".join([f"{msg.get('sender', 'Unknown')}: {msg.get('content', '')}" for msg in messages])
+                result = await gemini_explanation_service.generate_explanation(
+                    analysis_result=result,
+                    original_content=chat_content,
+                    channel="chat"
+                )
+            except Exception as e:
+                logger.warning(f"Gemini explanation failed, using original result: {str(e)}")
         
         return TextAnalysisResponse(
             analysis_id=result["analysis_id"],
@@ -492,6 +538,18 @@ async def analyze_unified(request: dict):
             )
             analysis["detected_type"] = "sms"
         
+        # Add Gemini explanation layer
+        if gemini_explanation_service.is_ready():
+            try:
+                result = await gemini_explanation_service.generate_explanation(
+                    analysis_result=analysis,
+                    original_content=content,
+                    channel=detected_type
+                )
+                analysis = result
+            except Exception as e:
+                logger.warning(f"Gemini explanation failed, using original result: {str(e)}")
+        
         # Add unified response format
         analysis["unified_analysis"] = True
         analysis["detection_confidence"] = get_detection_confidence(content, detected_type)
@@ -630,6 +688,10 @@ async def get_models_status():
         "gemini_analyzer": {
             "ready": gemini_analyzer.is_ready(),
             "model_name": gemini_analyzer.get_model_info()
+        },
+        "gemini_explanation_service": {
+            "ready": gemini_explanation_service.is_ready(),
+            "model_name": gemini_explanation_service.get_model_info()
         },
         "voice_analyzer": {
             "ready": False,
