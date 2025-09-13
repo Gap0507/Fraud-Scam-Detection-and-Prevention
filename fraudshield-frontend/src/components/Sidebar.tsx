@@ -6,6 +6,7 @@ import {
   HomeIcon, 
   ChatBubbleLeftRightIcon, 
   PhoneIcon, 
+  VideoCameraIcon,
   DocumentTextIcon, 
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon
@@ -40,6 +41,7 @@ export default function Sidebar() {
     { id: 'dashboard', label: 'Dashboard', icon: HomeIcon, href: '/dashboard' },
     { id: 'text-channels', label: 'Text Channels', icon: ChatBubbleLeftRightIcon, href: '/text-channels' },
     { id: 'voice-channels', label: 'Voice Channels', icon: PhoneIcon, href: '/voice-channels' },
+    { id: 'video-channels', label: 'Video Channels', icon: VideoCameraIcon, href: '/video-channels' },
     { id: 'transaction-channels', label: 'Transaction Channels', icon: DocumentTextIcon, href: '/transaction-channels' },
     { id: 'settings', label: 'Settings', icon: Cog6ToothIcon, href: '/settings' }
   ]

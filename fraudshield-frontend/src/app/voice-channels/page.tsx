@@ -40,86 +40,10 @@ export default function VoiceChannelsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking')
-  const [audioFiles, setAudioFiles] = useState<AudioFile[]>([])
-  const [selectedAudioFile, setSelectedAudioFile] = useState<AudioFile | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
-  // Demo audio files for initial load
-  const demoAudioFiles: AudioFile[] = [
-    {
-      id: '1',
-      name: 'margot-original.wav',
-      size: 13.37,
-      type: 'audio/wav',
-      timestamp: '2 hours ago',
-      isAnalyzed: true,
-      riskScore: 'LOW',
-      analysis: {
-        analysis_id: 'demo_1',
-        channel: 'voice',
-        risk_score: 0.15,
-        risk_level: 'LOW',
-        highlighted_tokens: [],
-        is_fraud: false,
-        triggers: [],
-        explanation: 'The audio appears to be a recording of a woman reading a statement, purportedly written by someone else (Brad), at an event or awards ceremony. The speech contains several characteristics indicative of genuine human speech, including hesitations, natural speech rhythm and intonation.',
-        confidence: 0.85,
-        processing_time: 7.85,
-        timestamp: new Date().toISOString(),
-        audio_file: 'margot-original.wav',
-        deepfake_score: 0.15,
-        is_deepfake: false,
-        audio_metadata: {
-          file_size: 14000000,
-          file_type: 'wav',
-          analysis_method: 'gemini_2_5_pro'
-        }
-      }
-    },
-    {
-      id: '2',
-      name: 'suspicious-call.mp3',
-      size: 8.2,
-      type: 'audio/mp3',
-      timestamp: '4 hours ago',
-      isAnalyzed: true,
-      riskScore: 'HIGH',
-      analysis: {
-        analysis_id: 'demo_2',
-        channel: 'voice',
-        risk_score: 0.92,
-        risk_level: 'HIGH',
-        highlighted_tokens: [],
-        is_fraud: true,
-        triggers: ['synthetic voice patterns', 'artificial intonation'],
-        explanation: 'This audio shows clear signs of synthetic generation with unnatural voice patterns and artificial intonation that are characteristic of deepfake technology.',
-        confidence: 0.92,
-        processing_time: 5.23,
-        timestamp: new Date().toISOString(),
-        audio_file: 'suspicious-call.mp3',
-        deepfake_score: 0.92,
-        is_deepfake: true,
-        audio_metadata: {
-          file_size: 8600000,
-          file_type: 'mp3',
-          analysis_method: 'gemini_2_5_pro'
-        }
-      }
-    },
-    {
-      id: '3',
-      name: 'meeting-recording.flac',
-      size: 25.1,
-      type: 'audio/flac',
-      timestamp: '1 day ago',
-      isAnalyzed: false,
-      riskScore: 'LOW'
-    }
-  ]
-
   useEffect(() => {
-    setAudioFiles(demoAudioFiles)
     checkBackendStatus()
   }, [])
 
@@ -152,20 +76,6 @@ export default function VoiceChannelsPage() {
       const result = await analyzeAudioGemini(selectedFile)
       setAnalysisResult(result)
       
-      // Add to audio files list
-      const newAudioFile: AudioFile = {
-        id: Date.now().toString(),
-        name: selectedFile.name,
-        size: selectedFile.size / 1024 / 1024,
-        type: selectedFile.type,
-        timestamp: 'Just now',
-        isAnalyzed: true,
-        riskScore: result.risk_level as 'HIGH' | 'MEDIUM' | 'LOW',
-        analysis: result
-      }
-      
-      setAudioFiles(prev => [newAudioFile, ...prev])
-      setSelectedAudioFile(newAudioFile)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed')
     } finally {
@@ -207,51 +117,6 @@ export default function VoiceChannelsPage() {
     }
   }
 
-  const analyzeAudioFile = async (audioFile: AudioFile) => {
-    if (audioFile.isAnalyzed || isAnalyzing) return
-
-    setIsAnalyzing(true)
-    try {
-      // Create a File object from the audio file data
-      const file = new File([], audioFile.name, { type: audioFile.type })
-      const result = await analyzeAudioGemini(file)
-
-      setAudioFiles(prev => prev.map(f => 
-        f.id === audioFile.id 
-          ? { 
-              ...f, 
-              analysis: result,
-              isAnalyzed: true,
-              riskScore: result.risk_level as 'HIGH' | 'MEDIUM' | 'LOW'
-            }
-          : f
-      ))
-
-    } catch (error) {
-      console.error('Analysis failed:', error)
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
-
-  const getRiskScoreColor = (risk: string) => {
-    switch (risk) {
-      case 'HIGH':
-        return 'bg-red-500/20 text-red-400'
-      case 'MEDIUM':
-        return 'bg-yellow-500/20 text-yellow-400'
-      case 'LOW':
-        return 'bg-green-500/20 text-green-400'
-      default:
-        return 'bg-gray-500/20 text-gray-400'
-    }
-  }
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-400'
-    if (confidence >= 0.6) return 'text-yellow-400'
-    return 'text-red-400'
-  }
 
   const formatFileSize = (size: number) => {
     return `${size.toFixed(1)} MB`
@@ -280,166 +145,123 @@ export default function VoiceChannelsPage() {
 
       {/* Content Area */}
       <div className="flex-1 flex">
-        {/* Audio Files List */}
-        <div className="flex-1 p-6">
-          <div className="bg-[#0D1117] rounded-lg border border-[#21262d] overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-[#161b22] text-xs text-gray-400 uppercase">
-                  <tr>
-                    <th className="px-6 py-3 text-left">File Name</th>
-                    <th className="px-6 py-3 text-left">Type</th>
-                    <th className="px-6 py-3 text-center">Size</th>
-                    <th className="px-6 py-3 text-center">AI Risk Score</th>
-                    <th className="px-6 py-3 text-center">Analysis Status</th>
-                    <th className="px-6 py-3 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {audioFiles.map((audioFile) => (
-                    <tr
-                      key={audioFile.id}
-                      onClick={() => setSelectedAudioFile(audioFile)}
-                      className={`border-b border-[#21262d] hover:bg-[#161b22] cursor-pointer transition-colors ${
-                        selectedAudioFile?.id === audioFile.id ? 'bg-[#161b22]' : 'bg-[#0D1117]'
-                      }`}
-                    >
-                      <td className="px-6 py-4 font-medium text-white whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <FileAudio className="w-5 h-5 text-[var(--accent-teal)]" />
-                          {audioFile.name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-xs font-medium text-gray-400">
-                          {audioFile.type.split('/')[1].toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-gray-400">
-                        {formatFileSize(audioFile.size)}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRiskScoreColor(audioFile.riskScore)}`}>
-                          {audioFile.riskScore}
-                        </span>
-                        {audioFile.analysis && (
-                          <div className="mt-1">
-                            <span className={`text-xs ${getConfidenceColor(audioFile.analysis.confidence)}`}>
-                              {(audioFile.analysis.confidence * 100).toFixed(0)}% confidence
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {audioFile.isAnalyzed ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Analyzed
-                          </span>
-                        ) : isAnalyzing ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
-                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-yellow-400 border-t-transparent mr-1"></div>
-                            Analyzing...
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
-                            <Info className="w-3 h-3 mr-1" />
-                            Pending
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (audioFile.analysis) {
-                                setAnalysisResult(audioFile.analysis)
-                              } else {
-                                analyzeAudioFile(audioFile)
-                              }
-                            }}
-                            className="text-[var(--accent-teal)] hover:text-[var(--accent-teal)]/80 transition-colors text-xs"
-                          >
-                            {audioFile.analysis ? 'View Details' : 'Analyze'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Upload Section */}
-          <div className="mt-6 bg-[#0D1117] rounded-lg border border-[#21262d] p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Upload New Audio File</h3>
-            <div className="flex gap-4">
-              <input
-                type="file"
-                accept="audio/*"
-                onChange={handleFileUpload}
-                className="flex-1 p-3 bg-[#161b22] border border-[#21262d] rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--accent-teal)]/20 file:text-[var(--accent-teal)] hover:file:bg-[var(--accent-teal)]/30"
-              />
-              <button
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`flex items-center gap-2 px-4 py-3 rounded-lg font-semibold transition-colors ${
-                  isRecording 
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' 
-                    : 'bg-[var(--accent-teal)]/20 text-[var(--accent-teal)] border border-[var(--accent-teal)]/30 hover:bg-[var(--accent-teal)]/30'
-                }`}
-              >
-                {isRecording ? (
-                  <>
-                    <Square className="w-4 h-4" />
-                    Stop Recording
-                  </>
-                ) : (
-                  <>
-                    <Volume2 className="w-4 h-4" />
-                    Record Audio
-                  </>
-                )}
-              </button>
-            </div>
-
-            {selectedFile && (
-              <div className="mt-4 p-3 bg-[#161b22] rounded-lg border border-[#21262d]">
-                <p className="text-sm text-gray-400">
-                  <strong>Selected file:</strong> {selectedFile.name} ({formatFileSize(selectedFile.size / 1024 / 1024)})
-                </p>
-                <button
-                  onClick={handleAnalyzeAudio}
-                  disabled={isAnalyzing}
-                  className="mt-3 flex items-center gap-2 px-4 py-2 bg-[var(--accent-teal)]/20 text-[var(--accent-teal)] border border-[var(--accent-teal)]/30 rounded-lg hover:bg-[var(--accent-teal)]/30 transition-colors disabled:opacity-50"
-                >
-                  <Brain className="w-4 h-4" />
-                  {isAnalyzing ? 'Analyzing...' : 'Analyze with AI'}
-                </button>
-              </div>
-            )}
-
-            {error && (
-              <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400" />
-                  <span className="text-red-400 text-sm">{error}</span>
+        {/* Center Upload Interface */}
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-2xl">
+            <div className="bg-[#0D1117] rounded-lg border border-[#21262d] p-8 text-center">
+              {/* Large Microphone Icon */}
+              <div className="flex justify-center mb-6">
+                <div className="w-24 h-24 bg-[var(--accent-teal)]/20 rounded-full flex items-center justify-center border-2 border-[var(--accent-teal)]/30">
+                  <Volume2 className="w-12 h-12 text-[var(--accent-teal)]" />
                 </div>
               </div>
-            )}
+
+              {/* Upload Title */}
+              <h3 className="text-2xl font-bold text-white mb-2">Upload Audio for Analysis</h3>
+              <p className="text-gray-400 mb-8">Upload an audio file or record directly to analyze for deepfake detection</p>
+
+              {/* Upload Options */}
+              <div className="space-y-4">
+                {/* File Upload */}
+                <div className="flex flex-col items-center gap-4">
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="audio-upload"
+                  />
+                  <label
+                    htmlFor="audio-upload"
+                    className="w-full max-w-md flex items-center justify-center gap-3 px-6 py-4 bg-[#161b22] border-2 border-dashed border-[#21262d] rounded-lg text-white hover:border-[var(--accent-teal)]/50 hover:bg-[#161b22]/80 transition-colors cursor-pointer"
+                  >
+                    <Upload className="w-5 h-5 text-[var(--accent-teal)]" />
+                    <span className="font-medium">Choose Audio File</span>
+                  </label>
+                </div>
+
+                {/* Divider */}
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 h-px bg-[#21262d]"></div>
+                  <span className="text-gray-500 text-sm">or</span>
+                  <div className="flex-1 h-px bg-[#21262d]"></div>
+                </div>
+
+                {/* Record Button */}
+                <div className="flex flex-col items-center gap-4">
+                  <button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    className={`w-full max-w-md flex items-center justify-center gap-3 px-6 py-4 rounded-lg font-semibold transition-colors ${
+                      isRecording 
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' 
+                        : 'bg-[var(--accent-teal)]/20 text-[var(--accent-teal)] border border-[var(--accent-teal)]/30 hover:bg-[var(--accent-teal)]/30'
+                    }`}
+                  >
+                    {isRecording ? (
+                      <>
+                        <Square className="w-5 h-5" />
+                        Stop Recording
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-5 h-5" />
+                        Record Audio
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Selected File Display */}
+              {selectedFile && (
+                <div className="mt-6 p-4 bg-[#161b22] rounded-lg border border-[#21262d]">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <FileAudio className="w-5 h-5 text-[var(--accent-teal)]" />
+                      <div className="text-left">
+                        <p className="text-white font-medium">{selectedFile.name}</p>
+                        <p className="text-gray-400 text-sm">{formatFileSize(selectedFile.size / 1024 / 1024)}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedFile(null)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <span className="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleAnalyzeAudio}
+                    disabled={isAnalyzing}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[var(--accent-teal)]/20 text-[var(--accent-teal)] border border-[var(--accent-teal)]/30 rounded-lg hover:bg-[var(--accent-teal)]/30 transition-colors disabled:opacity-50"
+                  >
+                    <Brain className="w-4 h-4" />
+                    {isAnalyzing ? 'Analyzing...' : 'Analyze with AI'}
+                  </button>
+                </div>
+              )}
+
+              {/* Error Display */}
+              {error && (
+                <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
+                  <div className="flex items-center justify-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                    <span className="text-red-400 text-sm">{error}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Analysis Results Panel */}
-        {(analysisResult || selectedAudioFile?.analysis) && (
+        {analysisResult && (
           <div className="w-96 bg-[#010409] border-l border-[#21262d] p-6 flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold">Analysis Results</h3>
               <button
                 onClick={() => {
                   setAnalysisResult(null)
-                  setSelectedAudioFile(null)
                 }}
                 className="text-gray-400 hover:text-white transition-colors"
               >
@@ -449,7 +271,7 @@ export default function VoiceChannelsPage() {
 
             <div className="flex-1 bg-[#0D1117] rounded-lg p-4 border border-[#21262d]">
               {(() => {
-                const result = analysisResult || selectedAudioFile?.analysis
+                const result = analysisResult
                 if (!result) return null
 
                 return (
@@ -500,7 +322,7 @@ export default function VoiceChannelsPage() {
                       <div className="mb-4">
                         <h4 className="text-white font-semibold mb-2">Detected Indicators</h4>
                         <div className="flex flex-wrap gap-2">
-                          {result.triggers.map((trigger, index) => (
+                          {result.triggers.map((trigger: string, index: number) => (
                             <span
                               key={index}
                               className="bg-red-500/20 text-red-400 text-xs font-medium px-2 py-1 rounded-full"

@@ -149,6 +149,39 @@ export interface AudioAnalysisResponse extends AnalysisResponse {
   }
 }
 
+export interface VideoAnalysisResponse extends AnalysisResponse {
+  video_file: string
+  deepfake_score: number
+  is_deepfake: boolean
+  face_analysis?: {
+    face_quality_score: number
+    face_consistency: number
+    facial_landmarks: number
+  }
+  lip_sync_score?: number
+  blink_analysis?: {
+    blink_rate: number
+    natural_blinks: boolean
+    blink_consistency: number
+  }
+  video_metadata: {
+    file_size?: number
+    file_type?: string
+    duration?: number
+    resolution?: string
+    fps?: number
+    analysis_method?: string
+  }
+  gemini_analysis?: {
+    face_quality_score: number
+    lip_sync_score: number
+    artificial_indicators: string[]
+    raw_response: string
+    model_used: string
+    analysis_type: string
+  }
+}
+
 export interface AnalysisRequest {
   content: string
   channel: 'sms' | 'email' | 'chat'
@@ -159,6 +192,11 @@ export interface AudioAnalysisRequest {
   audio_file: File
   caller_id?: string
   call_duration?: number
+}
+
+export interface VideoAnalysisRequest {
+  video_file: File
+  caller_id?: string
 }
 
 export interface EmailAnalysisRequest {
