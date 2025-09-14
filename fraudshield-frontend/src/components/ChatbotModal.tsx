@@ -103,10 +103,15 @@ export default function ChatbotModal({ isOpen, onClose }: ChatbotModalProps) {
       let aiResponse = ''
       
       if (analysis.gemini_explanation) {
-        // Use Gemini explanation for clean, concise response
+        // Use Gemini detailed explanation for comprehensive response
         const gemini = analysis.gemini_explanation
         
-        aiResponse = `${gemini.executive_summary} This message was detected as ${analysis.detected_type.toUpperCase()} with ${analysis.risk_level} risk (${(analysis.risk_score * 100).toFixed(1)}% confidence: ${(analysis.confidence * 100).toFixed(1)}%). Click "View Details" for full analysis.`
+        let nextStepsText = ''
+        if (gemini.next_steps) {
+          nextStepsText = `\n\nNext Steps:\nImmediate: ${gemini.next_steps.immediate}\nShort-term: ${gemini.next_steps.short_term}\nLong-term: ${gemini.next_steps.long_term}`
+        }
+        
+        aiResponse = `${gemini.detailed_explanation}\n\nTechnical Insights: ${gemini.technical_insights}\n\nConfidence Assessment: ${gemini.confidence_assessment}${nextStepsText}\n\nThis message was detected as ${analysis.detected_type.toUpperCase()} with ${analysis.risk_level} risk (${(analysis.risk_score * 100).toFixed(1)}% confidence: ${(analysis.confidence * 100).toFixed(1)}%). Click "View Details" for full analysis.`
       } else {
         // Fallback to basic explanation if Gemini explanation not available
         aiResponse = `Analysis complete: ${analysis.detected_type.toUpperCase()} content shows ${analysis.risk_level} risk (${(analysis.risk_score * 100).toFixed(1)}% confidence: ${(analysis.confidence * 100).toFixed(1)}%). Fraud detected: ${analysis.is_fraud ? 'YES' : 'NO'}. Click "View Details" for full analysis.`

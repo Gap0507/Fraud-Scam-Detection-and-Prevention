@@ -169,21 +169,8 @@ export default function AnalysisModal({ isOpen, onClose, analysis, messageType }
 
 
         {/* Content */}
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex-1 p-6 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent" style={{ scrollbarWidth: 'thin', scrollbarColor: 'transparent transparent' }}>
           {renderOverview()}
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-[#21262d] flex gap-3">
-          <button className="flex-1 bg-green-600/20 text-green-400 border border-green-600 rounded-md py-2 text-sm font-semibold hover:bg-green-600/30 transition-colors">
-            Mark as Safe
-          </button>
-          <button className="flex-1 bg-red-600/20 text-red-400 border border-red-600 rounded-md py-2 text-sm font-semibold hover:bg-red-600/30 transition-colors">
-            Quarantine
-          </button>
-          <button className="flex-1 bg-blue-600/20 text-blue-400 border border-blue-600 rounded-md py-2 text-sm font-semibold hover:bg-blue-600/30 transition-colors">
-            Export Report
-          </button>
         </div>
       </div>
     </div>
