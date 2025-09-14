@@ -3,12 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { 
-  HomeIcon, 
   ChatBubbleLeftRightIcon, 
   PhoneIcon, 
   VideoCameraIcon,
-  DocumentTextIcon, 
-  Cog6ToothIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline'
 
@@ -38,12 +35,9 @@ export default function Sidebar() {
   }
 
   const navigationItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: HomeIcon, href: '/dashboard' },
     { id: 'text-channels', label: 'Text Channels', icon: ChatBubbleLeftRightIcon, href: '/text-channels' },
     { id: 'voice-channels', label: 'Voice Channels', icon: PhoneIcon, href: '/voice-channels' },
-    { id: 'video-channels', label: 'Video Channels', icon: VideoCameraIcon, href: '/video-channels' },
-    { id: 'transaction-channels', label: 'Transaction Channels', icon: DocumentTextIcon, href: '/transaction-channels' },
-    { id: 'settings', label: 'Settings', icon: Cog6ToothIcon, href: '/settings' }
+    { id: 'video-channels', label: 'Video Channels', icon: VideoCameraIcon, href: '/video-channels' }
   ]
 
   // Don't show sidebar on login page

@@ -1,6 +1,6 @@
 """
-Gemini 2.5 Pro Deepfake Detection Service
-Uses Google's Gemini 2.5 Pro for audio/video deepfake detection
+Gemini 1.5 Flash Deepfake Detection Service
+Uses Google's Gemini 1.5 Flash for audio/video deepfake detection
 """
 
 import asyncio
@@ -23,7 +23,7 @@ class GeminiAnalyzer:
         self.api_key = None
         
     async def initialize(self):
-        """Initialize Gemini 2.5 Pro model"""
+        """Initialize Gemini 1.5 Flash model"""
         try:
             logger.info("Initializing Gemini Analyzer...")
             
@@ -39,7 +39,7 @@ class GeminiAnalyzer:
             genai.configure(api_key=self.api_key)
             
             # Initialize the model
-            self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            self.model = genai.GenerativeModel('gemini-1.5-flash')
             
             self.is_initialized = True
             logger.info("Gemini Analyzer initialized successfully")
@@ -51,7 +51,7 @@ class GeminiAnalyzer:
     
     async def analyze_audio(self, audio_file_path: str) -> Dict[str, Any]:
         """
-        Analyze audio file for deepfake detection using Gemini 2.5 Pro
+        Analyze audio file for deepfake detection using Gemini 1.5 Flash
         """
         start_time = time.time()
         analysis_id = f"gemini_audio_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}"
@@ -106,11 +106,11 @@ class GeminiAnalyzer:
                 "audio_metadata": {
                     "file_size": len(audio_data),
                     "file_type": self._get_file_extension(audio_file_path),
-                    "analysis_method": "gemini_2_5_pro"
+                    "analysis_method": "gemini_1_5_flash"
                 },
                 "gemini_analysis": {
                     "raw_response": response,
-                    "model_used": "gemini-2.0-flash-exp",
+                    "model_used": "gemini-1.5-flash",
                     "analysis_type": "deepfake_detection"
                 }
             }
@@ -121,7 +121,7 @@ class GeminiAnalyzer:
     
     async def analyze_video(self, video_file_path: str) -> Dict[str, Any]:
         """
-        Analyze video file for deepfake detection using Gemini 2.5 Pro
+        Analyze video file for deepfake detection using Gemini 1.5 Flash
         """
         start_time = time.time()
         analysis_id = f"gemini_video_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}"
@@ -176,11 +176,11 @@ class GeminiAnalyzer:
                 "video_metadata": {
                     "file_size": len(video_data),
                     "file_type": self._get_file_extension(video_file_path),
-                    "analysis_method": "gemini_2_5_pro"
+                    "analysis_method": "gemini_1_5_flash"
                 },
                 "gemini_analysis": {
                     "raw_response": response,
-                    "model_used": "gemini-2.0-flash-exp",
+                    "model_used": "gemini-1.5-flash",
                     "analysis_type": "deepfake_detection"
                 }
             }
@@ -375,4 +375,4 @@ class GeminiAnalyzer:
     
     def get_model_info(self) -> str:
         """Get model information"""
-        return "Gemini 2.0 Flash Experimental (Google AI)"
+        return "Gemini 1.5 Flash (Google AI)"
